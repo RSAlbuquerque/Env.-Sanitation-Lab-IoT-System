@@ -1,39 +1,46 @@
-#pragma once
+#ifndef NETWORKING_H
+#define NETWORKING_H
 
 #include <Arduino.h>
+#include <WiFi.h>
+#include <WiFiManager.h>
+#include <HTTPClient.h>
+#include <Update.h>
+#include <Preferences.h>
 
-/**
- * Check if WiFi is currently connected.
- * @return true if connected, false otherwise
- */
-bool isWifiConnected();
+class NetworkManager {
+public:
+    NetworkManager(int buttonPin, String apiKey, String firmwareUrl, String version);
 
-/**
- * Main WiFi connection function.
- * Based on the state of `useEAP`, it will attempt
- * to connect to eduroam or start WiFiManager.
- * Updates OLED display with connection status.
- */
-void connectWifi(bool reconnect);
+    void begin();
+    void handleInput();
 
-/**
- * Send sensor data to ThingSpeak cloud platform.
- * @param temperatureC Temperature in Celsius (Field 1)
- * @param tds Total Dissolved Solids value (Field 2)
- * @param pH pH value (Field 3)
- * @param apiKey ThingSpeak API key for authentication (16 characters)
- */
-void sendThingSpeakData(float temperatureC, float tds, float pH, const char* apiKey);
+    void connect(bool reconnect);
+    void sendHydroData(float temp, float tds, float ph);
+    void handleUpdates();
+    
+    bool isConnected();
 
-/**
- * Check if a new firmware update is available
- * Downloads version.txt from firmware server and compares with current version
- * @return true if new version is available, false otherwise
- */
-bool checkNewUpdate();
+private:
+    String _apiKey;
+    String _firmwareUrl;
+    String _currentVersion;
+    WiFiManager _wm;
+    int _buttonPin;
 
-/**
- * Download and install firmware update via OTA (Over-The-Air)
- * Updates OLED display during the process and reboots device on success
- */
-void updateFirmware();
+    void connectEduroam(bool reconnect);
+    void connectWifiManager(bool reconnect);
+    bool attemptLastNetwork(bool reconnect);
+    void connectionTimer(bool reconnect);
+    
+    bool checkNewUpdate(String &newVersion);
+    void updateFirmware();
+    int downloadFirmware(HTTPClient& http);
+    bool installFirmware(HTTPClient& http, int contentLength);
+
+    bool checkButtonInterrupt();
+};
+
+extern NetworkManager Network;
+
+#endif

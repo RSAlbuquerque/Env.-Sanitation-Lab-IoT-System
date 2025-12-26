@@ -21,7 +21,7 @@ void loop() {
 
     AirValues air = AirSensors.readAll();
 
-Serial.print("Temp:     "); Serial.print(air.temperature); Serial.println(" C");
+    Serial.print("Temp:     "); Serial.print(air.temperature); Serial.println(" C");
     Serial.print("Humidity: "); Serial.print(air.humidity);    Serial.println(" %");
     Serial.print("Pressure: "); Serial.print(air.pressure);    Serial.println(" hPa");
     Serial.print("VOC Res:  "); Serial.print(air.gasResistance); Serial.println(" KOhms");
