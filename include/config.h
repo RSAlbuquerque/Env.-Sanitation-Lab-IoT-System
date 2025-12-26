@@ -1,16 +1,12 @@
 #pragma once
 
-#include <cstdint>
-#include <OneWire.h>
-#include <DallasTemperature.h>
-#include <Wire.h>
+#include <Arduino.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-constexpr const char* VERSION = "1.1.8";
+constexpr const char* VERSION = "1.2.0";
 
 // Pins
-constexpr float VREF = 3.3f;
 constexpr int TEMPERATURE_PIN = 4;
 constexpr int BUTTON_PIN = 23;
 constexpr int TDS_PIN = 34;
@@ -37,19 +33,10 @@ constexpr const char* WIFI_MANAGER_IP = "192.168.4.1";
 extern String API_KEY;
 constexpr const char* THINGSPEAK_URL = "https://api.thingspeak.com/update";
 
-// DS18B20 setup (Temperature sensor)
-extern OneWire oneWire;
-extern DallasTemperature sensors;
-
-// KS0429 setup (TDS sensor)
-constexpr size_t FILTER_SAMPLE_COUNT = 20;
+// Networking Conversions
 constexpr float TDS_TO_COND_REF = 1.56f;
-extern std::array<int, FILTER_SAMPLE_COUNT> tdsAnalogBuffer;
 
-// PH4502C setup (pH sensor)
-constexpr int PH_NUM_READS = 20;
-
-// Buffer for URL
+// Buffer for URL (Used in Networking.cpp)
 constexpr size_t URL_BUFFER_SIZE = 200;
 extern char urlBuffer[URL_BUFFER_SIZE];
 

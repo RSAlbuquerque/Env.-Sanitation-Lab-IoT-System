@@ -1,18 +1,16 @@
 #include "config.h"
-
 #include <Preferences.h>
 
-OneWire oneWire(TEMPERATURE_PIN);
-DallasTemperature sensors(&oneWire);
-
-std::array<int, FILTER_SAMPLE_COUNT> tdsAnalogBuffer = {0};
-
+// Buffer for URL building (accessed by Networking.cpp)
 char urlBuffer[URL_BUFFER_SIZE];
 
+// Global Configuration Flags
 bool useEAP = true;
 
+// OLED Display Object
 Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+// Credential Storage
 String EAP_IDENTITY;
 String EAP_USERNAME;
 String EAP_PASSWORD;
