@@ -8,31 +8,12 @@
 #include "PMS.h" 
 #include <MQUnifiedsensor.h>
 
+#include "Types.h"
+
 #define BOARD_TYPE "ESP-32" 
 #define VOLTAGE_RESOLUTION 3.3
 #define ADC_BIT_RESOLUTION 12
 #define RATIO_MQ135_CLEAN_AIR 3.6
-
-struct AirValues {
-    // MQ-135 Values
-    float co;
-    float co2;
-    float nh4;
-    float alcohol;
-    float acetone;
-    float toluene;
-
-    // BME680 Values
-    float temperature;
-    float humidity;
-    float pressure;
-    float gasResistance;
-
-    // PMS5003 Values
-    int pm1_0;
-    int pm2_5;
-    int pm10_0;
-};
 
 class AirSensorsManager {
 public:

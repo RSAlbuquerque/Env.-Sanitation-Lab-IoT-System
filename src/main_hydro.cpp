@@ -42,7 +42,7 @@ void loop() {
   // Read sensor data
   if (currentTime - lastReadTime >= READ_INTERVAL) {
     currentValues = HydroSensors.readAll();
-    display.sensorValues(currentValues.temperature, currentValues.tds, currentValues.ph);
+    display.hydroSensorValues(currentValues.temperature, currentValues.tds, currentValues.ph);
     lastReadTime = currentTime;
   }
 

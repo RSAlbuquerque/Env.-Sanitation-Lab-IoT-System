@@ -5,17 +5,13 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <vector>
-#include <algorithm> // For std::sort
+#include <algorithm>
+
+#include "Types.h"
 
 // Default Constants (can be overridden in constructor)
 #define DEFAULT_TDS_VREF 3.3
 #define DEFAULT_ADC_RES 4096.0
-
-struct HydroValues {
-    float temperature;
-    float tds;
-    float ph;
-};
 
 class HydroSensorsManager {
 public:

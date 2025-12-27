@@ -62,9 +62,15 @@ AirValues AirSensorsManager::readAll() {
 void AirSensorsManager::readMQ135(AirValues &data) {
     _mq135->update();
 
-    // Read CO
     _mq135->setA(605.18); _mq135->setB(-3.937);
-    data.co = _mq135->readSensor();
+    float testCO = _mq135->readSensor();
+
+    if (isinf(testCO) || isnan(testCO) || testCO <= 0.0 || testCO > 1000000.0) {
+        return;
+    }
+
+    // Read CO (Update based on test value)
+    data.co = testCO;
 
     // Read Alcohol
     _mq135->setA(77.255); _mq135->setB(-3.18);
@@ -100,8 +106,19 @@ void AirSensorsManager::readBME680(AirValues &data) {
 void AirSensorsManager::readPMS5003(AirValues &data) {
     PMS::DATA pmsData;
 
-    int temp = _pms.read(pmsData);
-    data.pm1_0 = pmsData.PM_AE_UG_1_0;
-    data.pm2_5 = pmsData.PM_AE_UG_2_5;
-    data.pm10_0 = pmsData.PM_AE_UG_10_0;
+    unsigned long start = millis();
+    bool packetFound = false;
+
+    while (millis() - start < 1000) {
+        if (_pms.read(pmsData)) {
+            packetFound = true;
+            break;
+        }
+    }
+
+    if (packetFound) {
+        data.pm1_0 = pmsData.PM_AE_UG_1_0;
+        data.pm2_5 = pmsData.PM_AE_UG_2_5;
+        data.pm10_0 = pmsData.PM_AE_UG_10_0;
+    }
 }
