@@ -1,11 +1,22 @@
 #include "Networking.h"
-#include "Display.h"      
-#include "config.h"       
 
-NetworkManager::NetworkManager(int buttonPin, String apiKey, String firmwareUrl, String version) 
-    : _buttonPin(buttonPin), _apiKey(apiKey), _firmwareUrl(firmwareUrl), _currentVersion(version) {}
+NetworkManager::NetworkManager(Display& display, int buttonPin, 
+                               const char* eapSsid, const char* fallbackSsid, 
+                               const char* thingspeakUrl, unsigned long wifiTimeout,
+                               String firmwareUrl, String version) 
+    : _display(display), 
+      _buttonPin(buttonPin), 
+      _eapSsid(eapSsid), 
+      _fallbackSsid(fallbackSsid), 
+      _thingspeakUrl(thingspeakUrl), 
+      _wifiTimeout(wifiTimeout), 
+      _firmwareUrl(firmwareUrl), 
+      _currentVersion(version), 
+      _useEAP(true) 
+{}
 
-void NetworkManager::begin() {
+void NetworkManager::begin(UserCredentials &creds) {
+    _creds = creds;
     pinMode(_buttonPin, INPUT_PULLUP);
 }
 
@@ -18,29 +29,29 @@ bool NetworkManager::isConnected() {
 }
 
 void NetworkManager::connect(bool reconnect) {
-    display.modeSelector();
+    _display.modeSelector(_useEAP);
   
-    if (useEAP) {
+    if (_useEAP) {
         connectEduroam(reconnect);
     } else {
         connectWifiManager(reconnect);
     }
 
     if (isConnected()) {
-        display.wifiConnected(WiFi.SSID());
-        display.modeSelector();
+        _display.wifiConnected(WiFi.SSID());
+        _display.modeSelector(_useEAP);
     }
 }
 
 void NetworkManager::connectEduroam(bool reconnect) {
-    WiFi.begin(EAP_SSID, WPA2_AUTH_PEAP, EAP_IDENTITY, EAP_USERNAME, EAP_PASSWORD);
+    WiFi.begin(_eapSsid, WPA2_AUTH_PEAP, _creds.identity.c_str(), _creds.username.c_str(), _creds.password.c_str());
     connectionTimer(reconnect);
 }
 
 void NetworkManager::connectWifiManager(bool reconnect) {
     if (attemptLastNetwork(reconnect)) return;
 
-    display.waitToStartWM();
+    _display.waitToStartWM(15);
     unsigned long start = millis();
     
     while (millis() - start < 15000) {
@@ -51,10 +62,10 @@ void NetworkManager::connectWifiManager(bool reconnect) {
     _wm.setConnectTimeout(5);
     _wm.setConfigPortalTimeout(300);
 
-    display.wmInstructions();
+    _display.wmInstructions(_fallbackSsid, WM_IP);
     Serial.println("Starting WiFiManager...");
 
-    if (!_wm.autoConnect(FALLBACK_SSID_AP)) {
+    if (!_wm.autoConnect(_fallbackSsid)) {
         Serial.println("WiFiManager failed, rebooting...");
         ESP.restart();
     }
@@ -89,7 +100,7 @@ void NetworkManager::connectionTimer(bool reconnect) {
     int multiplier = reconnect ? 4 : 1;
     unsigned long startAttemptTime = millis();
 
-    while (!isConnected() && millis() - startAttemptTime < WIFI_TIMEOUT * multiplier) {
+    while (!isConnected() && millis() - startAttemptTime < _wifiTimeout * multiplier) {
         delay(500);
         Serial.print(".");
         
@@ -98,14 +109,49 @@ void NetworkManager::connectionTimer(bool reconnect) {
     Serial.println();
 }
 
-void NetworkManager::sendHydroData(float temp, float tds, float ph) {
+void NetworkManager::sendHydroData(const HydroValues& data) {
     if (!isConnected()) return;
 
-    float conductivity = tds * TDS_TO_COND_REF; 
+    char urlBuffer[256];
     
-    snprintf(urlBuffer, URL_BUFFER_SIZE,
+    snprintf(urlBuffer, sizeof(urlBuffer),
              "%s?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f&field4=%.2f",
-             THINGSPEAK_URL, _apiKey.c_str(), temp, tds, ph, conductivity);
+             _thingspeakUrl, 
+             _creds.apiKey.c_str(),
+             data.temperature, 
+             data.tds, 
+             data.ph, 
+             data.conductivity);
+
+    HTTPClient http;
+    http.begin(urlBuffer);
+    int httpCode = http.GET();
+    
+    if (httpCode > 0 && httpCode != 200) {
+        Serial.printf("ThingSpeak Error: %d\n", httpCode);
+    } else if (httpCode <= 0) {
+        Serial.printf("Error sending data: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+}
+
+void NetworkManager::sendAirData(const AirValues& data) {
+    if (!isConnected()) return;
+
+    char urlBuffer[256];
+    
+    snprintf(urlBuffer, sizeof(urlBuffer),
+             "%s?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f&field4=%.2f&field5=%.2f&field6=%.2f&field7=%.2f&field8=%.2f",
+             _thingspeakUrl, 
+             _creds.apiKey.c_str(),
+             data.pm2_5, 
+             data.pm10_0, 
+             data.toluene, 
+             data.co,
+             data.co2,
+             data.alcohol,
+             data.nh4,
+             data.acetone);
 
     HTTPClient http;
     http.begin(urlBuffer);
@@ -122,7 +168,7 @@ void NetworkManager::sendHydroData(float temp, float tds, float ph) {
 void NetworkManager::handleUpdates() {
     String newVersion;
     if (checkNewUpdate(newVersion)) {
-        display.updating(_currentVersion, newVersion);
+        _display.updating(_currentVersion, newVersion);
         updateFirmware();
     }
 }
@@ -201,9 +247,9 @@ bool NetworkManager::checkButtonInterrupt() {
     if (digitalRead(_buttonPin) == LOW) {
         static unsigned long lastPress = 0;
         if (millis() - lastPress > 200) {
-            useEAP = !useEAP;      
+            _useEAP = !_useEAP;    
             WiFi.disconnect(true); 
-            display.clear();       
+            _display.clear();       
             
             lastPress = millis();
             return true; 

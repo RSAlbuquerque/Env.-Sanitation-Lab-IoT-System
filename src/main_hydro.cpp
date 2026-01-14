@@ -1,34 +1,55 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-#include "Networking.h"
-#include "HydroSensors.h"
-#include "config.h"
-#include "Display.h"
+// Modules
+#include <Storage.h>
+#include <Display.h>
+#include <HydroSensors.h>
+#include <Networking.h>
+#include <Types.h>
 
-HydroSensorsManager HydroSensors(TEMPERATURE_PIN, TDS_PIN, PH_PIN);
-NetworkManager Network(BUTTON_PIN, API_KEY, FIRMWARE_URL, VERSION);
+#include "ConfigCommon.h"
+#include "ConfigHydro.h"
 
+Display display(Config::Display::WIDTH, Config::Display::HEIGHT, 
+                Config::Display::RESET_PIN, Config::Display::ADDRESS);
+
+HydroSensorsManager HydroSensors(Config::Hydro::Pins::TEMP, 
+                                 Config::Hydro::Pins::TDS, 
+                                 Config::Hydro::Pins::PH);
+
+NetworkManager Network(display, 
+                       Config::Hydro::Pins::BUTTON, 
+                       Config::Wifi::EAP_SSID,
+                       Config::Wifi::FALLBACK_SSID,
+                       Config::Cloud::THINGSPEAK_URL,
+                       Config::Wifi::TIMEOUT_MS,
+                       Config::Hydro::FW_URL, 
+                       Config::Hydro::VERSION);
+
+// Data Containers
 HydroValues currentValues;
+UserCredentials credentials;
 
+// Timers
 unsigned long currentTime = 0;
 unsigned long lastReadTime = 0;
 unsigned long lastUpdateCheckTime = 0;
 unsigned long lastSendTime = 0;
 
 void startTimers() {
-  lastSendTime = millis() - SEND_INTERVAL;
-  lastReadTime = millis() - READ_INTERVAL;
-  lastUpdateCheckTime = millis() - UPDATE_CHECK_INTERVAL;
+  lastSendTime = millis() - Config::Timers::SEND_INTERVAL;
+  lastReadTime = millis() - Config::Timers::READ_INTERVAL;
+  lastUpdateCheckTime = millis() - Config::Timers::CHECK_INTERVAL;
 }
 
 void setup() {
-  Serial.begin(115200);
-  loadCredentials();
+  Serial.begin(9600);
+  credentials = storage.loadCredentials();
 
-  display.setup();
+  display.begin(Config::Hydro::VERSION);
   HydroSensors.begin();
-  Network.begin();
+  Network.begin(credentials);
   delay(1000);
 
   Network.connect(false);
@@ -37,32 +58,36 @@ void setup() {
 
 void loop() {
   currentTime = millis();
-  Network.handleInput(); // Check for button presses
+  Network.handleInput();
 
-  // Read sensor data
-  if (currentTime - lastReadTime >= READ_INTERVAL) {
+  // --- READ SENSORS ---
+  if (currentTime - lastReadTime >= Config::Timers::READ_INTERVAL) {
     currentValues = HydroSensors.readAll();
-    display.hydroSensorValues(currentValues.temperature, currentValues.tds, currentValues.ph);
+    
+    currentValues.conductivity = currentValues.tds * Config::Hydro::TDS_FACTOR;
+    display.hydroSensorValues(currentValues);
+    
     lastReadTime = currentTime;
   }
 
-  // Ensure WiFi connection
+  // --- NETWORK CHECK ---
   if (!Network.isConnected()) {
     Network.connect(true);
   }
 
-  // Firmware update check
-  if (currentTime - lastUpdateCheckTime >= UPDATE_CHECK_INTERVAL) {
+  // --- FIRMWARE UPDATES ---
+  if (currentTime - lastUpdateCheckTime >= Config::Timers::CHECK_INTERVAL) {
     Network.handleUpdates();
     lastUpdateCheckTime = currentTime;
   }
 
-  // Send data to server
-  if (currentTime - lastSendTime >= SEND_INTERVAL 
+  // --- SEND DATA ---
+  if (currentTime - lastSendTime >= Config::Timers::SEND_INTERVAL 
       && Network.isConnected() 
       && currentValues.temperature > -100.0) {
     
-    Network.sendHydroData(currentValues.temperature, currentValues.tds, currentValues.ph);
+    Network.sendHydroData(currentValues);
+    
     lastSendTime = currentTime;
   }
 

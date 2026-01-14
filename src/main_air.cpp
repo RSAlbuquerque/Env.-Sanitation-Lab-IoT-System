@@ -1,53 +1,110 @@
 #include <Arduino.h>
-#include <Wire.h>
+#include <WiFi.h>
 
-#include "AirSensors.h"
-#include "Display.h"
-#include "Types.h"
+#include <Storage.h>
+#include <Display.h>
+#include <AirSensors.h>
+#include <Networking.h>
+#include <Types.h>
 
-unsigned long lastAirRead = 0;
-const unsigned long AIR_READ_INTERVAL = 3000;
+#include "ConfigCommon.h"
+#include "ConfigAir.h"
+
+Display display(Config::Display::WIDTH, Config::Display::HEIGHT, 
+                Config::Display::RESET_PIN, Config::Display::ADDRESS);
+
+AirSensorsManager AirSensors(Config::Air::Pins::MQ135,
+                             Config::Air::Pins::PMS_RX, 
+                             Config::Air::Pins::PMS_TX, 
+                             Config::Air::Pins::BME680_ADDR,
+                             Config::Air::Pins::BME680_ADDR_FB);
+
+NetworkManager Network(display, 
+                       Config::Air::Pins::BUTTON, 
+                       Config::Wifi::EAP_SSID,
+                       Config::Wifi::FALLBACK_SSID,
+                       Config::Cloud::THINGSPEAK_URL,
+                       Config::Wifi::TIMEOUT_MS,
+                       Config::Air::FW_URL, 
+                       Config::Air::VERSION);
+
+AirValues currentValues;
+UserCredentials credentials;
+
+// Timers
+unsigned long currentTime = 0;
+unsigned long lastReadTime = 0;
+unsigned long lastUpdateCheckTime = 0;
+unsigned long lastSendTime = 0;
+
+void startTimers() {
+  lastSendTime = millis() - Config::Timers::SEND_INTERVAL;
+  lastReadTime = millis() - Config::Timers::READ_INTERVAL;
+  lastUpdateCheckTime = millis() - Config::Timers::CHECK_INTERVAL;
+}
 
 void setup() {
   Serial.begin(9600);
-  delay(1000);
-  Serial.println("Initializing...");
-  delay(5000);
-  Wire.begin(21, 22);
-  delay(1000);
-  display.setup();
-  AirSensors.begin();
+  credentials = storage.loadCredentials();
 
-  Serial.println("Warming up sensors (20 sec)...");
-  delay(20000); 
+  display.begin(Config::Air::VERSION);
+  AirSensors.begin();
+   
+  display.debug("Warming Up...");
+
+  unsigned long startWarmup = millis();
+  while(millis() - startWarmup < 1000) {
+      Network.handleInput();
+      if((millis() - startWarmup) % 1000 == 0) {
+          Serial.print(".");
+      }
+      delay(10);
+  }
+  Serial.println("Warmup Complete.");
+
+  Network.begin(credentials);
+
+  Network.connect(false);
+
+  delay(5000);
+  display.debug(WiFi.localIP().toString());
+  delay(10000);
+  
+  startTimers();
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
+  currentTime = millis();
+  Network.handleInput(); 
 
-  if (currentMillis - lastAirRead >= AIR_READ_INTERVAL) {
-    lastAirRead = currentMillis;
-
-    AirValues air = AirSensors.readAll();
-
-    Serial.print("Temp:     "); Serial.print(air.temperature); Serial.println(" C");
-    Serial.print("Humidity: "); Serial.print(air.humidity);    Serial.println(" %");
-    Serial.print("Pressure: "); Serial.print(air.pressure);    Serial.println(" hPa");
-    Serial.print("VOC Res:  "); Serial.print(air.gasResistance); Serial.println(" KOhms");
+  // --- READ SENSORS ---
+  if (currentTime - lastReadTime >= Config::Timers::READ_INTERVAL) {
+    currentValues = AirSensors.readAll();
     
-    // MQ-135 Gases
-    Serial.print("CO:       "); Serial.print(air.co);            Serial.println(" ppm");
-    Serial.print("Alcohol:  "); Serial.print(air.alcohol);       Serial.println(" ppm");
-    Serial.print("CO2:      "); Serial.print(air.co2);           Serial.println(" ppm");
-    Serial.print("Toluen:   "); Serial.print(air.toluene);        Serial.println(" ppm");
-    Serial.print("NH4:      "); Serial.print(air.nh4);           Serial.println(" ppm");
-    Serial.print("Acetone:  "); Serial.print(air.acetone);       Serial.println(" ppm");
-
-    // PMS5003 Particles
-    Serial.print("PM1.0:    "); Serial.print(air.pm1_0);        Serial.println(" ug/m3");
-    Serial.print("PM2.5:    "); Serial.print(air.pm2_5);        Serial.println(" ug/m3");
-    Serial.print("PM10.0:   "); Serial.print(air.pm10_0);       Serial.println(" ug/m3");
-
-    display.airSensorValues(air);
+    display.airSensorValues(currentValues);
+    
+    lastReadTime = currentTime;
   }
+
+  // --- NETWORK CHECK ---
+  if (!Network.isConnected()) {
+    Network.connect(true);
+  }
+
+  // --- FIRMWARE UPDATES ---
+  if (currentTime - lastUpdateCheckTime >= Config::Timers::CHECK_INTERVAL) {
+    Network.handleUpdates();
+    lastUpdateCheckTime = currentTime;
+  }
+
+  // --- SEND DATA ---
+  if (currentTime - lastSendTime >= Config::Timers::SEND_INTERVAL 
+      && Network.isConnected()) {
+    
+    Network.sendAirData(currentValues);
+    
+    lastSendTime = currentTime;
+  }
+
+  delay(100); 
 }

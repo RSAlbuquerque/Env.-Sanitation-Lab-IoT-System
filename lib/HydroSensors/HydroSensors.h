@@ -9,9 +9,6 @@
 
 #include "Types.h"
 
-// Default Constants (can be overridden in constructor)
-#define DEFAULT_TDS_VREF 3.3
-#define DEFAULT_ADC_RES 4096.0
 
 class HydroSensorsManager {
 public:
@@ -28,8 +25,10 @@ private:
     int _tdsPin;
     int _phPin;
 
-    const float _vRef = DEFAULT_TDS_VREF;
-    const float _adcRes = DEFAULT_ADC_RES;
+    static constexpr float V_REF = 3.3;
+    static constexpr float ADC_RES = 4096.0;
+    static constexpr int FILTER_SAMPLES = 20;
+    static constexpr int PH_READS = 20;
 
     OneWire _oneWire;
     DallasTemperature _sensors;

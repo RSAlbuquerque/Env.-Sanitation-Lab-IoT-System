@@ -7,26 +7,45 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <Preferences.h>
+#include "Types.h" 
+#include "Display.h"
 
 class NetworkManager {
 public:
-    NetworkManager(int buttonPin, String apiKey, String firmwareUrl, String version);
+    NetworkManager(Display& display, int buttonPin, 
+                   const char* eapSsid, const char* fallbackSsid, 
+                   const char* thingspeakUrl, unsigned long wifiTimeout,
+                   String firmwareUrl, String version);
 
-    void begin();
+    void begin(UserCredentials &creds);
     void handleInput();
 
     void connect(bool reconnect);
-    void sendHydroData(float temp, float tds, float ph);
-    void handleUpdates();
+    void sendHydroData(const HydroValues& data);
+    void sendAirData(const AirValues& data);
     
+    void handleUpdates();
     bool isConnected();
+    
+    bool usingEAP() const { return _useEAP; }
 
 private:
-    String _apiKey;
+    Display& _display; // Reference to the Display object
+
+    const char* _eapSsid;
+    const char* _fallbackSsid;
+    const char* _thingspeakUrl;
+    unsigned long _wifiTimeout;
+
     String _firmwareUrl;
     String _currentVersion;
-    WiFiManager _wm;
     int _buttonPin;
+    
+    WiFiManager _wm;
+    UserCredentials _creds; 
+    bool _useEAP;
+
+    static constexpr const char* WM_IP = "192.168.4.1";
 
     void connectEduroam(bool reconnect);
     void connectWifiManager(bool reconnect);

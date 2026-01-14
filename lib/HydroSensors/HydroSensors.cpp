@@ -1,11 +1,5 @@
 #include "HydroSensors.h"
 
-#define FILTER_SAMPLE_COUNT 20
-#define PH_NUM_READS 20
-#define DEVICE_DISCONNECTED_C -127
-
-// Constructor
-// Note: We initialize OneWire and DallasTemperature using the initializer list
 HydroSensorsManager::HydroSensorsManager(int tempPin, int tdsPin, int phPin)
     : _tempPin(tempPin), 
       _tdsPin(tdsPin), 
@@ -42,12 +36,12 @@ float HydroSensorsManager::getTemperature() {
 
 float HydroSensorsManager::readTDS(float temperatureC) {
     std::vector<int> analogBuffer;
-    for (int i = 0; i < FILTER_SAMPLE_COUNT; i++) {
+    for (int i = 0; i < FILTER_SAMPLES; i++) {
         analogBuffer.push_back(analogRead(_tdsPin));
         delay(2);
     }
 
-    float averageVoltage = (getMedian(analogBuffer)) * _vRef / _adcRes;
+    float averageVoltage = (getMedian(analogBuffer)) * V_REF / ADC_RES;
     
     float safeTemp = (isTemperatureValid(temperatureC)) ? 25.0f : temperatureC;
     float compensationVoltage = averageVoltage / (1.0f + 0.02f * (safeTemp - 25.0f));
@@ -62,14 +56,14 @@ float HydroSensorsManager::readTDS(float temperatureC) {
 float HydroSensorsManager::readPH() {
     float voltageSum = 0;
 
-    for (int i = 0; i < PH_NUM_READS; i++) {
+    for (int i = 0; i < PH_READS; i++) {
         float raw = analogRead(_phPin);
-        voltageSum += (raw * _vRef) / 4095.0f;
+        voltageSum += (raw * V_REF) / 4095.0f;
         delay(10);
     }
     
-    float avgVoltage = voltageSum / PH_NUM_READS;
-    return 7 + (((_vRef / 2) - avgVoltage) / 0.1841f);
+    float avgVoltage = voltageSum / PH_READS;
+    return 7 + (((V_REF / 2) - avgVoltage) / 0.1841f);
 }
 
 bool HydroSensorsManager::isTemperatureValid(int temperatureC) {
