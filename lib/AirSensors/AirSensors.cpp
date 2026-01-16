@@ -1,4 +1,5 @@
 #include "AirSensors.h"
+#include <TelnetStream.h>
 
 // Constructor
 AirSensorsManager::AirSensorsManager(int mqPin, int pmsRxPin, int pmsTxPin, uint8_t bmeAddr, uint8_t bmeAddrFb) 
@@ -27,22 +28,19 @@ void AirSensorsManager::begin() {
         Serial.print(".");
         delay(1000); 
     }
-    Serial.println(" Done!");
     
     _mq135->setR0(calcR0 / MQ_CALIB_SAMPLES);
 
-    if(isinf(calcR0)) { Serial.println(F("Warning: MQ135 Connection issue (Open Circuit)")); }
-    if(calcR0 == 0)   { Serial.println(F("Warning: MQ135 Connection issue (Short Circuit)")); }
+    if(isinf(calcR0)) { Serial.println("Warning: MQ135 Connection issue (Open Circuit)"); }
+    if(calcR0 == 0)   { Serial.println("Warning: MQ135 Connection issue (Short Circuit)"); }
     
     // BME680 Initialization
     bool bmeFound = false;
 
     if (_bme.begin(_bmeAddr)) {
-        Serial.println("Found at Primary Address.");
         bmeFound = true;
     } 
     else if (_bme.begin(_bmeAddrFb)) {
-        Serial.println("Found at Fallback Address.");
         bmeFound = true;
     } 
     else {
@@ -59,7 +57,17 @@ void AirSensorsManager::begin() {
 
     // PMS5003 Initialization
     _pmsSerial.begin(9600, SERIAL_8N1, _pmsRx, _pmsTx);
-    _pms.activeMode(); 
+    delay(300);
+
+    while (_pmsSerial.available()) _pmsSerial.read();
+
+    _pms.wakeUp();
+    delay(500);
+
+    _pms.activeMode();
+    delay(500);
+
+    while (_pmsSerial.available()) _pmsSerial.read();
 }
 
 AirValues AirSensorsManager::readAll() {
@@ -117,9 +125,32 @@ void AirSensorsManager::readBME680(AirValues &data) {
 void AirSensorsManager::readPMS5003(AirValues &data) {
     PMS::DATA pmsData;
 
-    if (_pms.read(pmsData)) {
-        data.pm1_0  = pmsData.PM_AE_UG_1_0;
-        data.pm2_5  = pmsData.PM_AE_UG_2_5;
-        data.pm10_0 = pmsData.PM_AE_UG_10_0;
+    uint32_t sum1 = 0, sum25 = 0, sum10 = 0;
+    int good = 0;
+
+    for (int i = 0; i < PMS_FRAMES; ++i) {
+        if (_pms.readUntil(pmsData, PMS_READ_TIMEOUT)) {
+            sum1  += pmsData.PM_AE_UG_1_0;
+            sum25 += pmsData.PM_AE_UG_2_5;
+            sum10 += pmsData.PM_AE_UG_10_0;
+            good++;
+        } else {
+            TelnetStream.println("PMS: frame timeout");
+        }
     }
+
+    if (good == 0) {
+        data.pm1_0 = data.pm2_5 = data.pm10_0 = -1;
+        TelnetStream.println("PMS: no valid frames");
+        return;
+    }
+
+    data.pm1_0  = (int)round((float)sum1  / good);
+    data.pm2_5  = (int)round((float)sum25 / good);
+    data.pm10_0 = (int)round((float)sum10 / good);
+
+    TelnetStream.printf(
+        "PMS avg(%d): PM1=%d PM2.5=%d PM10=%d\n",
+        good, data.pm1_0, data.pm2_5, data.pm10_0
+    );
 }

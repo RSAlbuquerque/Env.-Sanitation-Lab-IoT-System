@@ -38,6 +38,8 @@ private:
     static constexpr float RATIO_MQ135_CLEAN_AIR = 3.6;
     static constexpr int MQ_CALIB_SAMPLES = 10;
     static constexpr int MQ_CORRECTION_FACTOR = 0;
+    static constexpr int PMS_READ_TIMEOUT = 1200; // milliseconds, per frame
+    static constexpr int PMS_FRAMES = 3;
 
     // Helper functions
     void readMQ135(AirValues &data);

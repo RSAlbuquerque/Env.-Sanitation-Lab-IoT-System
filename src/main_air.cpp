@@ -1,11 +1,13 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <TelnetStream.h>
 
 #include <Storage.h>
 #include <Display.h>
 #include <AirSensors.h>
 #include <Networking.h>
 #include <Types.h>
+#include <DebugLog.h>
 
 #include "ConfigCommon.h"
 #include "ConfigAir.h"
@@ -28,6 +30,8 @@ NetworkManager Network(display,
                        Config::Air::FW_URL, 
                        Config::Air::VERSION);
 
+DebugLog debugLog(false);
+
 AirValues currentValues;
 UserCredentials credentials;
 
@@ -43,6 +47,19 @@ void startTimers() {
   lastUpdateCheckTime = millis() - Config::Timers::CHECK_INTERVAL;
 }
 
+void warmupSensors() {
+  // Used to warmup the MQ-135
+  unsigned long startWarmup = millis();
+  unsigned long warmupTime = 20000;
+  while(millis() - startWarmup < warmupTime) {
+      Network.handleInput();
+      if((millis() - startWarmup) % 1000 == 0) {
+          Serial.print(".");
+      }
+      delay(10);
+  }
+}
+
 void setup() {
   Serial.begin(9600);
   credentials = storage.loadCredentials();
@@ -51,24 +68,17 @@ void setup() {
   AirSensors.begin();
    
   display.debug("Warming Up...");
-
-  unsigned long startWarmup = millis();
-  while(millis() - startWarmup < 1000) {
-      Network.handleInput();
-      if((millis() - startWarmup) % 1000 == 0) {
-          Serial.print(".");
-      }
-      delay(10);
-  }
-  Serial.println("Warmup Complete.");
+  warmupSensors();
 
   Network.begin(credentials);
-
   Network.connect(false);
-
   delay(5000);
-  display.debug(WiFi.localIP().toString());
-  delay(10000);
+
+  if (debugLog.enabled()) {
+    display.debug(WiFi.localIP().toString());
+    delay(10000);
+    TelnetStream.begin();
+  }
   
   startTimers();
 }
@@ -100,7 +110,6 @@ void loop() {
   // --- SEND DATA ---
   if (currentTime - lastSendTime >= Config::Timers::SEND_INTERVAL 
       && Network.isConnected()) {
-    
     Network.sendAirData(currentValues);
     
     lastSendTime = currentTime;

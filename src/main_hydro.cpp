@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <TelnetStream.h>
 
 // Modules
 #include <Storage.h>
@@ -53,6 +54,12 @@ void setup() {
   delay(1000);
 
   Network.connect(false);
+  delay(5000);
+
+  // display.debug(WiFi.localIP().toString());
+  // delay(10000);
+  TelnetStream.begin();
+
   startTimers();
 }
 

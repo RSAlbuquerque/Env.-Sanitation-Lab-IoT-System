@@ -1,4 +1,5 @@
 #include "Networking.h"
+#include <TelnetStream.h>
 
 NetworkManager::NetworkManager(Display& display, int buttonPin, 
                                const char* eapSsid, const char* fallbackSsid, 
@@ -12,7 +13,7 @@ NetworkManager::NetworkManager(Display& display, int buttonPin,
       _wifiTimeout(wifiTimeout), 
       _firmwareUrl(firmwareUrl), 
       _currentVersion(version), 
-      _useEAP(true) 
+      _useEAP(false) 
 {}
 
 void NetworkManager::begin(UserCredentials &creds) {
@@ -29,6 +30,7 @@ bool NetworkManager::isConnected() {
 }
 
 void NetworkManager::connect(bool reconnect) {
+    Serial.println(_useEAP);
     _display.modeSelector(_useEAP);
   
     if (_useEAP) {
@@ -158,9 +160,13 @@ void NetworkManager::sendAirData(const AirValues& data) {
     int httpCode = http.GET();
     
     if (httpCode > 0 && httpCode != 200) {
+        Serial.print(_creds.apiKey);
+        Serial.println(" N - " + _creds.apiKey.length());
+        Serial.print(_creds.apiKey.c_str());
+        Serial.println(" S- " + String(strlen(_creds.apiKey.c_str())));
         Serial.printf("ThingSpeak Error: %d\n", httpCode);
     } else if (httpCode <= 0) {
-        Serial.printf("Error sending data: %s\n", http.errorToString(httpCode).c_str());
+        TelnetStream.printf("Error sending data: %s\n", http.errorToString(httpCode).c_str());
     }
     http.end();
 }
