@@ -13,8 +13,7 @@ A dual-module IoT monitoring system developed to track air and water quality in 
 
 - **Microcontroller**: ESP32
 - **Language/Framework**: C++ / Arduino
-- **Communication Protocols**: WiFi
-- **Deployment**: OTA (Over-The-Air) updates
+- **Communication Protocols**: WiFi (LoRaWAN may be added on the future)
 
 ## 📂 System Overview
 
