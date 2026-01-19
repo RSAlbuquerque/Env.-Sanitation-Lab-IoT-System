@@ -1,38 +1,26 @@
 #include "Networking.h"
+
 #include <TelnetStream.h>
 
-NetworkManager::NetworkManager(Display& display, int buttonPin, 
-                               const char* eapSsid, const char* fallbackSsid, 
-                               const char* thingspeakUrl, unsigned long wifiTimeout,
-                               String firmwareUrl, String version) 
-    : _display(display), 
-      _buttonPin(buttonPin), 
-      _eapSsid(eapSsid), 
-      _fallbackSsid(fallbackSsid), 
-      _thingspeakUrl(thingspeakUrl), 
-      _wifiTimeout(wifiTimeout), 
-      _firmwareUrl(firmwareUrl), 
-      _currentVersion(version), 
-      _useEAP(false) 
-{}
+NetworkManager::NetworkManager(Display &display, int buttonPin, const char *eapSsid, const char *fallbackSsid,
+                               const char *thingspeakUrl, unsigned long wifiTimeout, String firmwareUrl, String version)
+    : _display(display), _buttonPin(buttonPin), _eapSsid(eapSsid), _fallbackSsid(fallbackSsid),
+      _thingspeakUrl(thingspeakUrl), _wifiTimeout(wifiTimeout), _firmwareUrl(firmwareUrl), _currentVersion(version),
+      _useEAP(false) {}
 
 void NetworkManager::begin(UserCredentials &creds) {
     _creds = creds;
     pinMode(_buttonPin, INPUT_PULLUP);
 }
 
-void NetworkManager::handleInput() {
-    checkButtonInterrupt();
-}
+void NetworkManager::handleInput() { checkButtonInterrupt(); }
 
-bool NetworkManager::isConnected() {
-    return WiFi.status() == WL_CONNECTED;
-}
+bool NetworkManager::isConnected() { return WiFi.status() == WL_CONNECTED; }
 
 void NetworkManager::connect(bool reconnect) {
     Serial.println(_useEAP);
     _display.modeSelector(_useEAP);
-  
+
     if (_useEAP) {
         connectEduroam(reconnect);
     } else {
@@ -51,13 +39,15 @@ void NetworkManager::connectEduroam(bool reconnect) {
 }
 
 void NetworkManager::connectWifiManager(bool reconnect) {
-    if (attemptLastNetwork(reconnect)) return;
+    if (attemptLastNetwork(reconnect))
+        return;
 
     _display.waitToStartWM(15);
     unsigned long start = millis();
-    
+
     while (millis() - start < 15000) {
-        if (checkButtonInterrupt()) return;
+        if (checkButtonInterrupt())
+            return;
         delay(500);
     }
 
@@ -83,13 +73,15 @@ void NetworkManager::connectWifiManager(bool reconnect) {
 
 bool NetworkManager::attemptLastNetwork(bool reconnect) {
     Preferences preferences;
-    if (!preferences.begin("wifiCreds", true)) return false;
-    
+    if (!preferences.begin("wifiCreds", true))
+        return false;
+
     String ssid = preferences.getString("ssid", "");
     String pass = preferences.getString("pass", "");
     preferences.end();
 
-    if (ssid.isEmpty()) return false;
+    if (ssid.isEmpty())
+        return false;
 
     Serial.println("Attempting saved network: " + ssid);
     WiFi.begin(ssid.c_str(), pass.c_str());
@@ -105,30 +97,26 @@ void NetworkManager::connectionTimer(bool reconnect) {
     while (!isConnected() && millis() - startAttemptTime < _wifiTimeout * multiplier) {
         delay(500);
         Serial.print(".");
-        
-        if (checkButtonInterrupt()) return;
+
+        if (checkButtonInterrupt())
+            return;
     }
     Serial.println();
 }
 
-void NetworkManager::sendHydroData(const HydroValues& data) {
-    if (!isConnected()) return;
+void NetworkManager::sendHydroData(const HydroValues &data) {
+    if (!isConnected())
+        return;
 
     char urlBuffer[256];
-    
-    snprintf(urlBuffer, sizeof(urlBuffer),
-             "%s?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f&field4=%.2f",
-             _thingspeakUrl, 
-             _creds.apiKey.c_str(),
-             data.temperature, 
-             data.tds, 
-             data.ph, 
-             data.conductivity);
+
+    snprintf(urlBuffer, sizeof(urlBuffer), "%s?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f&field4=%.2f",
+             _thingspeakUrl, _creds.apiKey.c_str(), data.temperature, data.tds, data.ph, data.conductivity);
 
     HTTPClient http;
     http.begin(urlBuffer);
     int httpCode = http.GET();
-    
+
     if (httpCode > 0 && httpCode != 200) {
         Serial.printf("ThingSpeak Error: %d\n", httpCode);
     } else if (httpCode <= 0) {
@@ -137,28 +125,22 @@ void NetworkManager::sendHydroData(const HydroValues& data) {
     http.end();
 }
 
-void NetworkManager::sendAirData(const AirValues& data) {
-    if (!isConnected()) return;
+void NetworkManager::sendAirData(const AirValues &data) {
+    if (!isConnected())
+        return;
 
     char urlBuffer[256];
-    
-    snprintf(urlBuffer, sizeof(urlBuffer),
-             "%s?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f&field4=%.2f&field5=%.2f&field6=%.2f&field7=%.2f&field8=%.2f",
-             _thingspeakUrl, 
-             _creds.apiKey.c_str(),
-             data.pm2_5, 
-             data.pm10_0, 
-             data.toluene, 
-             data.co,
-             data.co2,
-             data.alcohol,
-             data.nh4,
-             data.acetone);
+
+    snprintf(
+        urlBuffer, sizeof(urlBuffer),
+        "%s?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f&field4=%.2f&field5=%.2f&field6=%.2f&field7=%.2f&field8=%.2f",
+        _thingspeakUrl, _creds.apiKey.c_str(), data.pm2_5, data.pm10_0, data.toluene, data.co, data.co2, data.alcohol,
+        data.nh4, data.acetone);
 
     HTTPClient http;
     http.begin(urlBuffer);
     int httpCode = http.GET();
-    
+
     if (httpCode > 0 && httpCode != 200) {
         Serial.print(_creds.apiKey);
         Serial.println(" N - " + _creds.apiKey.length());
@@ -180,7 +162,8 @@ void NetworkManager::handleUpdates() {
 }
 
 bool NetworkManager::checkNewUpdate(String &newVersion) {
-    if (!isConnected() || _firmwareUrl.isEmpty()) return false;
+    if (!isConnected() || _firmwareUrl.isEmpty())
+        return false;
 
     HTTPClient http;
     http.begin(_firmwareUrl + "/version.txt");
@@ -200,11 +183,12 @@ bool NetworkManager::checkNewUpdate(String &newVersion) {
 }
 
 void NetworkManager::updateFirmware() {
-    if (!isConnected()) return;
+    if (!isConnected())
+        return;
 
     HTTPClient http;
     int contentLength = downloadFirmware(http);
-    
+
     if (contentLength > 0) {
         if (installFirmware(http, contentLength)) {
             ESP.restart();
@@ -213,11 +197,11 @@ void NetworkManager::updateFirmware() {
     http.end();
 }
 
-int NetworkManager::downloadFirmware(HTTPClient& http) {
+int NetworkManager::downloadFirmware(HTTPClient &http) {
     Serial.println("Downloading firmware...");
     http.begin(_firmwareUrl + "/firmware.bin");
     int httpCode = http.GET();
-    
+
     if (httpCode != 200) {
         Serial.printf("Download Error: %s\n", http.errorToString(httpCode).c_str());
         return -1;
@@ -225,9 +209,9 @@ int NetworkManager::downloadFirmware(HTTPClient& http) {
     return http.getSize();
 }
 
-bool NetworkManager::installFirmware(HTTPClient& http, int contentLength) {
+bool NetworkManager::installFirmware(HTTPClient &http, int contentLength) {
     Serial.println("Installing...");
-    WiFiClient* stream = http.getStreamPtr();
+    WiFiClient *stream = http.getStreamPtr();
 
     if (!Update.begin(contentLength)) {
         Serial.println("Not enough space for OTA");
@@ -243,7 +227,7 @@ bool NetworkManager::installFirmware(HTTPClient& http, int contentLength) {
     if (Update.end() && Update.isFinished()) {
         Serial.println("Update Success!");
         return true;
-    } 
+    }
 
     Serial.printf("Update Error: %s\n", Update.errorString());
     return false;
@@ -253,12 +237,12 @@ bool NetworkManager::checkButtonInterrupt() {
     if (digitalRead(_buttonPin) == LOW) {
         static unsigned long lastPress = 0;
         if (millis() - lastPress > 200) {
-            _useEAP = !_useEAP;    
-            WiFi.disconnect(true); 
-            _display.clear();       
-            
+            _useEAP = !_useEAP;
+            WiFi.disconnect(true);
+            _display.clear();
+
             lastPress = millis();
-            return true; 
+            return true;
         }
     }
     return false;

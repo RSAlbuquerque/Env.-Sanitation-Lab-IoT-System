@@ -1,26 +1,25 @@
 #ifndef HYDRO_SENSORS_H
 #define HYDRO_SENSORS_H
 
-#include <Arduino.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
-#include <vector>
-#include <algorithm>
-
 #include "Types.h"
 
+#include <algorithm>
+#include <Arduino.h>
+#include <DallasTemperature.h>
+#include <OneWire.h>
+#include <vector>
 
 class HydroSensorsManager {
-public:
+  public:
     HydroSensorsManager(int tempPin, int tdsPin, int phPin);
-    
+
     void begin();
     HydroValues readAll();
 
     float getTemperature();
     bool isTemperatureValid(int temperatureC);
 
-private:
+  private:
     int _tempPin;
     int _tdsPin;
     int _phPin;
@@ -37,7 +36,7 @@ private:
 
     float readTDS(float temperatureC);
     float readPH();
-    int getMedian(std::vector<int>& data);
+    int getMedian(std::vector<int> &data);
 };
 
 extern HydroSensorsManager HydroSensors;

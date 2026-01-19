@@ -1,12 +1,13 @@
 #pragma once
 
-#include <Arduino.h>
-#include <Preferences.h>
 #include "Types.h"
 
+#include <Arduino.h>
+#include <Preferences.h>
+
 class StorageManager {
-public:
-    void saveCredentials(const char* identity, const char* username, const char* pass, const char* apiKey);
+  public:
+    void saveCredentials(const char *identity, const char *username, const char *pass, const char *apiKey);
     UserCredentials loadCredentials();
     void clearCredentials();
 };
