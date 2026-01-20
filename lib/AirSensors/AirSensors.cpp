@@ -1,5 +1,7 @@
 #include "AirSensors.h"
 
+#include "DebugLog.h"
+
 #include <TelnetStream.h>
 
 // Constructor
@@ -15,22 +17,23 @@ void AirSensorsManager::begin() {
     _mq135->setRegressionMethod(1);
     _mq135->init();
 
-    Serial.print("Calibrating MQ-135");
+    Debug.info("Calibrating MQ135...");
     float calcR0 = 0;
     for (int i = 1; i <= MQ_CALIB_SAMPLES; i++) {
         _mq135->update();
         calcR0 += _mq135->calibrate(RATIO_MQ135_CLEAN_AIR);
-        Serial.print(".");
         delay(1000);
     }
 
     _mq135->setR0(calcR0 / MQ_CALIB_SAMPLES);
 
     if (isinf(calcR0)) {
-        Serial.println("Warning: MQ135 Connection issue (Open Circuit)");
+        Debug.warn("MQ135 Connection issue (Open Circuit)");
     }
     if (calcR0 == 0) {
-        Serial.println("Warning: MQ135 Connection issue (Short Circuit)");
+        Debug.warn("MQ135 Connection issue (Short Circuit)");
+    } else {
+        Debug.info("MQ135 R0 Calibrated: %.2f kOhms", _mq135->getR0());
     }
 
     // BME680 Initialization
@@ -41,7 +44,7 @@ void AirSensorsManager::begin() {
     } else if (_bme.begin(_bmeAddrFb)) {
         bmeFound = true;
     } else {
-        Serial.println("Error: BME680 not found!");
+        Debug.error("BME680 not found at 0x%02X or 0x%02X", _bmeAddr, _bmeAddrFb);
     }
 
     if (bmeFound) {
@@ -78,9 +81,11 @@ AirValues AirSensorsManager::readAll() {
     // error/no-read)
     data = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
+    Debug.debug("Reading Air Sensors...");
     readMQ135(data);
     readBME680(data);
     readPMS5003(data);
+    Debug.debug("Air Sensors reading complete.");
 
     return data;
 }
@@ -94,6 +99,7 @@ void AirSensorsManager::readMQ135(AirValues &data) {
     float testCO = _mq135->readSensor(false, MQ_CORRECTION_FACTOR);
 
     if (isinf(testCO) || isnan(testCO) || testCO <= 0.0 || testCO > 1000000.0) {
+        Debug.error("MQ135 reading error");
         data.co = -2;
         return;
     }
@@ -106,7 +112,7 @@ void AirSensorsManager::readMQ135(AirValues &data) {
 
     _mq135->setA(110.47);
     _mq135->setB(-2.862);
-    data.co2 = _mq135->readSensor() + 400; // Offset for atmospheric CO2
+    data.co2 = _mq135->readSensor(false, MQ_CORRECTION_FACTOR) + 400; // Offset for atmospheric CO2
 
     _mq135->setA(44.947);
     _mq135->setB(-3.445);
@@ -119,6 +125,9 @@ void AirSensorsManager::readMQ135(AirValues &data) {
     _mq135->setA(34.668);
     _mq135->setB(-3.369);
     data.acetone = _mq135->readSensor(false, MQ_CORRECTION_FACTOR);
+
+    Debug.debug("MQ135: ADC=%.2f CO=%.2fppm CO2=%.2fppm NH4=%.2fppm Alcohol=%.2fppm Acetone=%.2fppm Toluene=%.2fppm",
+                data.adc_mq135, data.co, data.co2, data.nh4, data.alcohol, data.acetone, data.toluene);
 }
 
 void AirSensorsManager::readBME680(AirValues &data) {
@@ -127,6 +136,10 @@ void AirSensorsManager::readBME680(AirValues &data) {
         data.humidity = _bme.humidity;
         data.pressure = _bme.pressure / 100.0;
         data.gasResistance = _bme.gas_resistance / 1000.0;
+        Debug.debug("BME680: T=%.2fC H=%.2f%% P=%.2fhPa G=%.2kOhm", data.temperature, data.humidity, data.pressure,
+                    data.gasResistance);
+    } else {
+        Debug.error("BME680 reading error");
     }
 }
 
@@ -143,13 +156,13 @@ void AirSensorsManager::readPMS5003(AirValues &data) {
             sum10 += pmsData.PM_AE_UG_10_0;
             good++;
         } else {
-            TelnetStream.println("PMS: frame timeout");
+            Debug.error("PMS5003 frame timeout");
         }
     }
 
     if (good == 0) {
         data.pm1_0 = data.pm2_5 = data.pm10_0 = -1;
-        TelnetStream.println("PMS: no valid frames");
+        Debug.error("PMS5003: no valid frames");
         return;
     }
 
@@ -157,5 +170,5 @@ void AirSensorsManager::readPMS5003(AirValues &data) {
     data.pm2_5 = (int)round((float)sum25 / good);
     data.pm10_0 = (int)round((float)sum10 / good);
 
-    TelnetStream.printf("PMS avg(%d): PM1=%d PM2.5=%d PM10=%d\n", good, data.pm1_0, data.pm2_5, data.pm10_0);
+    Debug.debug("PMS5003: PM1=%d PM2.5=%d PM10=%d (avg of %d frames)", data.pm1_0, data.pm2_5, data.pm10_0, good);
 }

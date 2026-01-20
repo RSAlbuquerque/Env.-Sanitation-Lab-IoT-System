@@ -1,16 +1,17 @@
-#include <Arduino.h>
-#include <TelnetStream.h>
-#include <WiFi.h>
-
-// Modules
 #include "ConfigCommon.h"
 #include "ConfigHydro.h"
+#include "DebugLog.h"
 
+#include <Arduino.h>
 #include <Display.h>
 #include <HydroSensors.h>
 #include <Networking.h>
 #include <Storage.h>
+#include <TelnetStream.h>
 #include <Types.h>
+#include <WiFi.h>
+
+DebugLog Debug;
 
 Display display(Config::Display::WIDTH, Config::Display::HEIGHT, Config::Display::RESET_PIN, Config::Display::ADDRESS);
 
@@ -48,9 +49,11 @@ void setup() {
     Network.connect(false);
     delay(5000);
 
-    // display.debug(WiFi.localIP().toString());
-    // delay(10000);
+#if ENABLE_DEBUG
+    display.debug(WiFi.localIP().toString());
     TelnetStream.begin();
+    delay(5000);
+#endif
 
     startTimers();
 }

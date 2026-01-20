@@ -26,8 +26,6 @@ class NetworkManager {
     void handleUpdates();
     bool isConnected();
 
-    bool usingEAP() const { return _useEAP; }
-
   private:
     Display &_display; // Reference to the Display object
 

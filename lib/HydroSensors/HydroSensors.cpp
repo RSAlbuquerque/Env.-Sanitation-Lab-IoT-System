@@ -1,5 +1,7 @@
 #include "HydroSensors.h"
 
+#include "DebugLog.h"
+
 HydroSensorsManager::HydroSensorsManager(int tempPin, int tdsPin, int phPin)
     : _tempPin(tempPin), _tdsPin(tdsPin), _phPin(phPin), _oneWire(tempPin), _sensors(&_oneWire) {
     _data = {0.0, 0.0, 7.0};
@@ -12,9 +14,11 @@ void HydroSensorsManager::begin() {
 }
 
 HydroValues HydroSensorsManager::readAll() {
+    Debug.debug("Reading Hydro Sensors...");
     _data.temperature = getTemperature();
     _data.tds = readTDS(_data.temperature);
     _data.ph = readPH();
+    Debug.debug("Hydro Sensors reading complete.");
 
     return _data;
 }
@@ -25,7 +29,10 @@ float HydroSensorsManager::getTemperature() {
 
     if (isTemperatureValid(tempC)) {
         return -1.0;
+        Debug.error("Temperature sensor reading error");
     }
+
+    Debug.debug("Temperature: %.2f C", tempC);
     return tempC;
 }
 
@@ -45,6 +52,8 @@ float HydroSensorsManager::readTDS(float temperatureC) {
                       857.39f * compensationVoltage) *
                      0.5f;
 
+    Debug.debug("TDS: %.2f ppm (Voltage: %.2f V, Compensated Voltage: %.2f V, Temp: %.2f C)", tdsValue, averageVoltage,
+                compensationVoltage, safeTemp);
     return tdsValue;
 }
 
@@ -58,7 +67,9 @@ float HydroSensorsManager::readPH() {
     }
 
     float avgVoltage = voltageSum / PH_READS;
-    return 7 + (((V_REF / 2) - avgVoltage) / 0.1841f);
+    float phValue = 7 + (((V_REF / 2) - avgVoltage) / 0.1841f);
+    Debug.debug("pH: %.2f, Avg Voltage=%.2f V with VREF of %.2f V", phValue, avgVoltage, V_REF);
+    return phValue;
 }
 
 bool HydroSensorsManager::isTemperatureValid(int temperatureC) {

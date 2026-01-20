@@ -1,6 +1,9 @@
 #pragma once
 #include <Arduino.h>
 
+#define ENABLE_DEBUG 1
+#define DEBUG_LEVEL 3 // 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG
+
 namespace Config {
 
     namespace Wifi {

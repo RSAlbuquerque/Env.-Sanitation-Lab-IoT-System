@@ -1,16 +1,19 @@
 #include "Networking.h"
 
+#include "DebugLog.h"
+
 #include <TelnetStream.h>
 
 NetworkManager::NetworkManager(Display &display, int buttonPin, const char *eapSsid, const char *fallbackSsid,
                                const char *thingspeakUrl, unsigned long wifiTimeout, String firmwareUrl, String version)
     : _display(display), _buttonPin(buttonPin), _eapSsid(eapSsid), _fallbackSsid(fallbackSsid),
       _thingspeakUrl(thingspeakUrl), _wifiTimeout(wifiTimeout), _firmwareUrl(firmwareUrl), _currentVersion(version),
-      _useEAP(false) {}
+      _useEAP(true) {}
 
 void NetworkManager::begin(UserCredentials &creds) {
     _creds = creds;
     pinMode(_buttonPin, INPUT_PULLUP);
+    Debug.debug("NetworkManager using EAP: %s", _useEAP ? "true" : "false");
 }
 
 void NetworkManager::handleInput() { checkButtonInterrupt(); }
@@ -18,7 +21,7 @@ void NetworkManager::handleInput() { checkButtonInterrupt(); }
 bool NetworkManager::isConnected() { return WiFi.status() == WL_CONNECTED; }
 
 void NetworkManager::connect(bool reconnect) {
-    Serial.println(_useEAP);
+    Debug.debug("Attempting to connect using %s", _useEAP ? "EAP" : "WiFiManager");
     _display.modeSelector(_useEAP);
 
     if (_useEAP) {
@@ -55,10 +58,10 @@ void NetworkManager::connectWifiManager(bool reconnect) {
     _wm.setConfigPortalTimeout(300);
 
     _display.wmInstructions(_fallbackSsid, WM_IP);
-    Serial.println("Starting WiFiManager...");
+    Debug.debug("Starting WiFiManager...");
 
     if (!_wm.autoConnect(_fallbackSsid)) {
-        Serial.println("WiFiManager failed, rebooting...");
+        Debug.error("WiFiManager failed, rebooting...");
         ESP.restart();
     }
 
@@ -83,7 +86,7 @@ bool NetworkManager::attemptLastNetwork(bool reconnect) {
     if (ssid.isEmpty())
         return false;
 
-    Serial.println("Attempting saved network: " + ssid);
+    Debug.info("Attempting to connect to last known network: %s", ssid.c_str());
     WiFi.begin(ssid.c_str(), pass.c_str());
     connectionTimer(reconnect);
 
@@ -96,12 +99,10 @@ void NetworkManager::connectionTimer(bool reconnect) {
 
     while (!isConnected() && millis() - startAttemptTime < _wifiTimeout * multiplier) {
         delay(500);
-        Serial.print(".");
 
         if (checkButtonInterrupt())
             return;
     }
-    Serial.println();
 }
 
 void NetworkManager::sendHydroData(const HydroValues &data) {
@@ -118,9 +119,9 @@ void NetworkManager::sendHydroData(const HydroValues &data) {
     int httpCode = http.GET();
 
     if (httpCode > 0 && httpCode != 200) {
-        Serial.printf("ThingSpeak Error: %d\n", httpCode);
+        Debug.error("ThingSpeak Error: %s", http.errorToString(httpCode).c_str());
     } else if (httpCode <= 0) {
-        Serial.printf("Error sending data: %s\n", http.errorToString(httpCode).c_str());
+        Debug.error("Error sending data: %s", http.errorToString(httpCode).c_str());
     }
     http.end();
 }
@@ -142,13 +143,9 @@ void NetworkManager::sendAirData(const AirValues &data) {
     int httpCode = http.GET();
 
     if (httpCode > 0 && httpCode != 200) {
-        Serial.print(_creds.apiKey);
-        Serial.println(" N - " + _creds.apiKey.length());
-        Serial.print(_creds.apiKey.c_str());
-        Serial.println(" S- " + String(strlen(_creds.apiKey.c_str())));
-        Serial.printf("ThingSpeak Error: %d\n", httpCode);
+        Debug.error("ThingSpeak Error: %s", http.errorToString(httpCode).c_str());
     } else if (httpCode <= 0) {
-        TelnetStream.printf("Error sending data: %s\n", http.errorToString(httpCode).c_str());
+        Debug.error("Error sending data: %s", http.errorToString(httpCode).c_str());
     }
     http.end();
 }
@@ -178,7 +175,7 @@ bool NetworkManager::checkNewUpdate(String &newVersion) {
     newVersion.trim();
     http.end();
 
-    Serial.println("Current: " + _currentVersion + " | Remote: " + newVersion);
+    Debug.info("Current version: %s, Remote version: %s", _currentVersion.c_str(), newVersion.c_str());
     return newVersion != _currentVersion;
 }
 
@@ -198,38 +195,38 @@ void NetworkManager::updateFirmware() {
 }
 
 int NetworkManager::downloadFirmware(HTTPClient &http) {
-    Serial.println("Downloading firmware...");
+    Debug.info("Downloading firmware...");
     http.begin(_firmwareUrl + "/firmware.bin");
     int httpCode = http.GET();
 
     if (httpCode != 200) {
-        Serial.printf("Download Error: %s\n", http.errorToString(httpCode).c_str());
+        Debug.error("Firmware download failed: %s", http.errorToString(httpCode).c_str());
         return -1;
     }
     return http.getSize();
 }
 
 bool NetworkManager::installFirmware(HTTPClient &http, int contentLength) {
-    Serial.println("Installing...");
+    Debug.info("Installing new firmware...");
     WiFiClient *stream = http.getStreamPtr();
 
     if (!Update.begin(contentLength)) {
-        Serial.println("Not enough space for OTA");
+        Debug.error("Not enough space for OTA");
         return false;
     }
 
     size_t written = Update.writeStream(*stream);
     if (written != contentLength) {
-        Serial.println("Write mismatch");
+        Debug.error("Write mismatch: written %d, expected %d", written, contentLength);
         return false;
     }
 
     if (Update.end() && Update.isFinished()) {
-        Serial.println("Update Success!");
+        Debug.info("Update Success!");
         return true;
     }
 
-    Serial.printf("Update Error: %s\n", Update.errorString());
+    Debug.error("Update failed: %s", Update.errorString());
     return false;
 }
 

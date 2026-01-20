@@ -1,50 +1,101 @@
-// DebugLog.h
 #pragma once
+
+#include "ConfigCommon.h"
 
 #include <Arduino.h>
 #include <stdarg.h>
 #include <TelnetStream.h>
 
+// Log levels
+#define LOG_ERROR 1
+#define LOG_WARN 2
+#define LOG_INFO 3
+#define LOG_DEBUG 4
+
 class DebugLog {
   public:
-    // Overloads for Arduino String
-    inline void print(const String &s) {
-        Serial.print(s);
-        TelnetStream.print(s);
+#if ENABLE_DEBUG && DEBUG_LEVEL >= LOG_ERROR
+    inline void error(const char *fmt, ...) {
+        printPrefix("ERROR");
+
+        va_list args;
+        va_start(args, fmt);
+        vprintfImpl(fmt, args);
+        va_end(args);
+
+        newline();
+    }
+#else
+    inline void error(const char *, ...) {}
+#endif
+
+#if ENABLE_DEBUG && DEBUG_LEVEL >= LOG_WARN
+    inline void warn(const char *fmt, ...) {
+        printPrefix("WARN");
+
+        va_list args;
+        va_start(args, fmt);
+        vprintfImpl(fmt, args);
+        va_end(args);
+
+        newline();
+    }
+#else
+    inline void warn(const char *, ...) {}
+#endif
+
+#if ENABLE_DEBUG && DEBUG_LEVEL >= LOG_INFO
+    inline void info(const char *fmt, ...) {
+        printPrefix("INFO");
+
+        va_list args;
+        va_start(args, fmt);
+        vprintfImpl(fmt, args);
+        va_end(args);
+
+        newline();
+    }
+#else
+    inline void info(const char *, ...) {}
+#endif
+
+#if ENABLE_DEBUG && DEBUG_LEVEL >= LOG_DEBUG
+    inline void debug(const char *fmt, ...) {
+        printPrefix("DEBUG");
+
+        va_list args;
+        va_start(args, fmt);
+        vprintfImpl(fmt, args);
+        va_end(args);
+
+        newline();
+    }
+#else
+    inline void debug(const char *, ...) {}
+#endif
+
+  private:
+#if ENABLE_DEBUG
+    inline void printPrefix(const char *lvl) {
+        Serial.print(lvl);
+        Serial.print(": ");
+        TelnetStream.print(lvl);
+        TelnetStream.print(": ");
     }
 
-    inline void println(const String &s) {
-        Serial.println(s);
-        TelnetStream.println(s);
-    }
-
-    // Overloads for C-style strings
-    inline void print(const char *s) {
-        Serial.print(s);
-        TelnetStream.print(s);
-    }
-    inline void println(const char *s) {
-        Serial.println(s);
-        TelnetStream.println(s);
-    }
-
-    // Print a newline
-    inline void println() {
+    inline void newline() {
         Serial.println();
         TelnetStream.println();
     }
 
-    // Formatted print
-    inline void printf(const char *fmt, ...) {
-        constexpr size_t BUF_SZ = 512;
+    inline void vprintfImpl(const char *fmt, va_list args) {
+        constexpr size_t BUF_SZ = 256;
         char buf[BUF_SZ];
-
-        va_list args;
-        va_start(args, fmt);
         vsnprintf(buf, BUF_SZ, fmt, args);
-        va_end(args);
-
         Serial.print(buf);
         TelnetStream.print(buf);
     }
+#endif
 };
+
+extern DebugLog Debug;
