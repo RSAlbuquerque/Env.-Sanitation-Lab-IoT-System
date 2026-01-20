@@ -1,5 +1,6 @@
 #include "ConfigAir.h"
 #include "ConfigCommon.h"
+#include "DebugLog.h"
 
 #include <AirSensors.h>
 #include <Arduino.h>
@@ -11,6 +12,8 @@
 #include <Types.h>
 #include <WiFi.h>
 
+DebugLog Debug;
+
 Display display(Config::Display::WIDTH, Config::Display::HEIGHT, Config::Display::RESET_PIN, Config::Display::ADDRESS);
 
 AirSensorsManager AirSensors(Config::Air::Pins::MQ135, Config::Air::Pins::PMS_RX, Config::Air::Pins::PMS_TX,
@@ -20,9 +23,8 @@ NetworkManager Network(display, Config::Air::Pins::BUTTON, Config::Wifi::EAP_SSI
                        Config::Cloud::THINGSPEAK_URL, Config::Wifi::TIMEOUT_MS, Config::Air::FW_URL,
                        Config::Air::VERSION);
 
-DebugLog debugLog();
-
 AirValues currentValues;
+
 UserCredentials credentials;
 
 // Timers
@@ -30,6 +32,8 @@ unsigned long currentTime = 0;
 unsigned long lastReadTime = 0;
 unsigned long lastUpdateCheckTime = 0;
 unsigned long lastSendTime = 0;
+unsigned long warmupStartTime = 0;
+bool sensorsWarmedUp = false;
 
 void startTimers() {
     lastSendTime = millis() - Config::Timers::SEND_INTERVAL;
@@ -43,9 +47,6 @@ void warmupSensors() {
     unsigned long warmupTime = 20000;
     while (millis() - startWarmup < warmupTime) {
         Network.handleInput();
-        if ((millis() - startWarmup) % 1000 == 0) {
-            Serial.print(".");
-        }
         delay(10);
     }
 }
@@ -57,19 +58,17 @@ void setup() {
     display.begin(Config::Air::VERSION);
     AirSensors.begin();
 
-    display.debug("Warming Up...");
-    warmupSensors();
+    Debug.info("Warming up sensors, reads won't be available for %d seconds.", Config::Air::SENSOR_WARMUP_MS / 1000);
 
     Network.begin(credentials);
     Network.connect(false);
     delay(5000);
 
-    // debugLog.setEnabled(true);
-    if (debugLog.isEnabled()) {
-        display.debug(WiFi.localIP().toString());
-        delay(10000);
-        TelnetStream.begin();
-    }
+#if ENABLE_DEBUG
+    display.debug(WiFi.localIP().toString());
+    TelnetStream.begin();
+    delay(5000);
+#endif
 
     startTimers();
 }
@@ -78,8 +77,16 @@ void loop() {
     currentTime = millis();
     Network.handleInput();
 
+    // --- SENSOR WARMUP ---
+    if (!sensorsWarmedUp) {
+        if (currentTime - warmupStartTime >= Config::Air::SENSOR_WARMUP_MS) {
+            sensorsWarmedUp = true;
+            Debug.info("Sensors warmed up, starting readings.");
+        }
+    }
+
     // --- READ SENSORS ---
-    if (currentTime - lastReadTime >= Config::Timers::READ_INTERVAL) {
+    if (sensorsWarmedUp && (currentTime - lastReadTime >= Config::Timers::READ_INTERVAL)) {
         currentValues = AirSensors.readAll();
 
         display.airSensorValues(currentValues);
@@ -99,7 +106,7 @@ void loop() {
     }
 
     // --- SEND DATA ---
-    if (currentTime - lastSendTime >= Config::Timers::SEND_INTERVAL && Network.isConnected()) {
+    if (sensorsWarmedUp && (currentTime - lastSendTime >= Config::Timers::SEND_INTERVAL) && Network.isConnected()) {
         Network.sendAirData(currentValues);
 
         lastSendTime = currentTime;
