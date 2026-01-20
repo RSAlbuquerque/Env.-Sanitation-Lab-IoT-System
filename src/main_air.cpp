@@ -64,7 +64,6 @@ void setup() {
     Network.connect(false);
     delay(5000);
 
-#if ENABLE_DEBUG
     display.debug(WiFi.localIP().toString());
     TelnetStream.begin();
     delay(5000);
@@ -102,6 +101,7 @@ void loop() {
     // --- FIRMWARE UPDATES ---
     if (currentTime - lastUpdateCheckTime >= Config::Timers::CHECK_INTERVAL) {
         Network.handleUpdates();
+
         lastUpdateCheckTime = currentTime;
     }
 

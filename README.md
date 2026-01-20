@@ -20,13 +20,22 @@ A dual-module IoT monitoring system developed to track air and water quality in 
 The system architecture is divided into two specialized modules:
 
 ### 💧 Water Quality Module
+
 - **KS0429 (TDS)**: Measures Total Dissolved Solids to evaluate water purity.
 - **PH4502 (pH)**: Monitors acidity or alkalinity levels.
 - **DS18B20**: High-precision temperature sensor for liquid monitoring.
 
 ### 🌬️ Air Quality Module
+
 - **MQ-135**: Monitors general air quality based on gas resistance (derives CO, CO2, NH4, alcohol, acetone and toluene values).
 - **BME680**: Integrated environmental sensor for Temperature, Humidity, Pressure, and VOC (Volatile Organic Compounds) index.
 - **PMS5003**: Laser-based sensor for measuring particulate matter concentrations (PM1.0, PM2.5, and PM10).
- 
+
+## 📊 Data Access
+
+You can view the sensor data collected by this project at the following links (temporary solution until a better system is developed):
+
+- **Air Quality (PMS5003):** [Thingspeak Channel](https://thingspeak.mathworks.com/channels/3229374)
+- **Hydro / Water Sensors:** [Thingspeak Channel](https://thingspeak.mathworks.com/channels/3058451)
+
 ---

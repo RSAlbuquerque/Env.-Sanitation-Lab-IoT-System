@@ -20,14 +20,14 @@ void NetworkManager::handleInput() { checkButtonInterrupt(); }
 
 bool NetworkManager::isConnected() { return WiFi.status() == WL_CONNECTED; }
 
-void NetworkManager::connect(bool reconnect) {
+void NetworkManager::connect(bool reconnectFlag) { // reconectFlag is used to increase timeout on reconnection attempts
     Debug.debug("Attempting to connect using %s", _useEAP ? "EAP" : "WiFiManager");
     _display.modeSelector(_useEAP);
 
     if (_useEAP) {
-        connectEduroam(reconnect);
+        connectEduroam(reconnectFlag);
     } else {
-        connectWifiManager(reconnect);
+        connectWifiManager(reconnectFlag);
     }
 
     if (isConnected()) {
@@ -36,13 +36,13 @@ void NetworkManager::connect(bool reconnect) {
     }
 }
 
-void NetworkManager::connectEduroam(bool reconnect) {
+void NetworkManager::connectEduroam(bool reconnectFlag) {
     WiFi.begin(_eapSsid, WPA2_AUTH_PEAP, _creds.identity.c_str(), _creds.username.c_str(), _creds.password.c_str());
-    connectionTimer(reconnect);
+    connectionTimer(reconnectFlag);
 }
 
-void NetworkManager::connectWifiManager(bool reconnect) {
-    if (attemptLastNetwork(reconnect))
+void NetworkManager::connectWifiManager(bool reconnectFlag) {
+    if (attemptLastNetwork(reconnectFlag))
         return;
 
     _display.waitToStartWM(15);
@@ -74,7 +74,7 @@ void NetworkManager::connectWifiManager(bool reconnect) {
     }
 }
 
-bool NetworkManager::attemptLastNetwork(bool reconnect) {
+bool NetworkManager::attemptLastNetwork(bool reconnectFlag) {
     Preferences preferences;
     if (!preferences.begin("wifiCreds", true))
         return false;
@@ -88,13 +88,13 @@ bool NetworkManager::attemptLastNetwork(bool reconnect) {
 
     Debug.info("Attempting to connect to last known network: %s", ssid.c_str());
     WiFi.begin(ssid.c_str(), pass.c_str());
-    connectionTimer(reconnect);
+    connectionTimer(reconnectFlag);
 
     return isConnected();
 }
 
-void NetworkManager::connectionTimer(bool reconnect) {
-    int multiplier = reconnect ? 4 : 1;
+void NetworkManager::connectionTimer(bool reconnectFlag) {
+    int multiplier = reconnectFlag ? 4 : 1;
     unsigned long startAttemptTime = millis();
 
     while (!isConnected() && millis() - startAttemptTime < _wifiTimeout * multiplier) {

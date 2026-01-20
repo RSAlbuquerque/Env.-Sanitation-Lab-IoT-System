@@ -45,6 +45,7 @@ class AirSensorsManager {
     void readMQ135(AirValues &data);
     void readBME680(AirValues &data);
     void readPMS5003(AirValues &data);
+    void pmsDebug();
 };
 
 #endif

@@ -26,7 +26,7 @@ namespace Config {
     }
 
     namespace Timers {
-        constexpr unsigned long READ_INTERVAL = 2000UL;                 // 20 secs
+        constexpr unsigned long READ_INTERVAL = 20000UL;                // 20 secs
         constexpr unsigned long SEND_INTERVAL = 15 * 60 * 1000UL;       // 15 mins
         constexpr unsigned long CHECK_INTERVAL = 24 * 60 * 60 * 1000UL; // 24h
     }

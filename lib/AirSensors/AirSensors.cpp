@@ -149,14 +149,19 @@ void AirSensorsManager::readPMS5003(AirValues &data) {
     uint32_t sum1 = 0, sum25 = 0, sum10 = 0;
     int good = 0;
 
+    if (true) // Enable this to get raw PMS5003 packets for debugging
+        pmsDebug();
+
     for (int i = 0; i < PMS_FRAMES; ++i) {
         if (_pms.readUntil(pmsData, PMS_READ_TIMEOUT)) {
+            Debug.debug("Frame %d: PM1=%d PM2.5=%d PM10=%d", i, pmsData.PM_AE_UG_1_0, pmsData.PM_AE_UG_2_5,
+                        pmsData.PM_AE_UG_10_0);
             sum1 += pmsData.PM_AE_UG_1_0;
             sum25 += pmsData.PM_AE_UG_2_5;
             sum10 += pmsData.PM_AE_UG_10_0;
             good++;
         } else {
-            Debug.error("PMS5003 frame timeout");
+            Debug.error("PMS5003 frame %d timeout", i);
         }
     }
 
@@ -171,4 +176,28 @@ void AirSensorsManager::readPMS5003(AirValues &data) {
     data.pm10_0 = (int)round((float)sum10 / good);
 
     Debug.debug("PMS5003: PM1=%d PM2.5=%d PM10=%d (avg of %d frames)", data.pm1_0, data.pm2_5, data.pm10_0, good);
+}
+
+void AirSensorsManager::pmsDebug() {
+    Debug.debug("=== Reading PMS5003 raw packets ===");
+    for (int i = 0; i < PMS_FRAMES; ++i) {
+        Debug.debug("--- Frame %d ---", i);
+        int bytesAvailable = _pmsSerial.available();
+        Debug.debug("Bytes available: %d", bytesAvailable);
+
+        if (bytesAvailable > 0) {
+            String rawBytes = "Raw bytes: ";
+            for (int j = 0; j < min(bytesAvailable, 32); j++) {
+                if (_pmsSerial.available()) {
+                    uint8_t b = _pmsSerial.read();
+                    char hex[4];
+                    sprintf(hex, "%02X ", b);
+                    rawBytes += hex;
+                }
+            }
+            Debug.debug(rawBytes.c_str());
+        }
+        delay(1000);
+    }
+    Debug.debug("=== End raw packet dump ===");
 }
