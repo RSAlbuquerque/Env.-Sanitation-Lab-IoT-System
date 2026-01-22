@@ -135,6 +135,14 @@ void Display::airSensorValues(const AirValues &data) {
     }
 }
 
+void Display::warmingUpAirSensors(int seconds) {
+    if (!_oledReady)
+        return;
+    clear();
+    writeLine("Warming up sensors", 2);
+    writeLine(String(seconds) + " seconds left", 3);
+}
+
 void Display::updating(const String &currentVersion, const String &newVersion) {
     if (!_oledReady)
         return;

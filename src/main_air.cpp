@@ -34,6 +34,7 @@ unsigned long lastUpdateCheckTime = 0;
 unsigned long lastSendTime = 0;
 unsigned long warmupStartTime = 0;
 bool sensorsWarmedUp = false;
+bool calibrateMQ135 = false;
 
 void startTimers() {
     lastSendTime = millis() - Config::Timers::SEND_INTERVAL;
@@ -41,33 +42,19 @@ void startTimers() {
     lastUpdateCheckTime = millis() - Config::Timers::CHECK_INTERVAL;
 }
 
-void warmupSensors() {
-    // Used to warmup the MQ-135
-    unsigned long startWarmup = millis();
-    unsigned long warmupTime = 20000;
-    while (millis() - startWarmup < warmupTime) {
-        Network.handleInput();
-        delay(10);
-    }
-}
-
 void setup() {
     Serial.begin(9600);
     credentials = storage.loadCredentials();
 
     display.begin(Config::Air::VERSION);
-    AirSensors.begin();
 
     Debug.info("Warming up sensors, reads won't be available for %d seconds.", Config::Air::SENSOR_WARMUP_MS / 1000);
+    warmupStartTime = millis();
+    display.warmingUpAirSensors(Config::Air::SENSOR_WARMUP_MS / 1000);
 
     Network.begin(credentials);
     Network.connect(false);
     delay(5000);
-
-    display.debug(WiFi.localIP().toString());
-    TelnetStream.begin();
-    delay(5000);
-#endif
 
     startTimers();
 }
@@ -80,15 +67,19 @@ void loop() {
     if (!sensorsWarmedUp) {
         if (currentTime - warmupStartTime >= Config::Air::SENSOR_WARMUP_MS) {
             sensorsWarmedUp = true;
+            AirSensors.begin();
             Debug.info("Sensors warmed up, starting readings.");
+        } else {
+            int secondsLeft = (Config::Air::SENSOR_WARMUP_MS - (currentTime - warmupStartTime)) / 1000;
+            display.warmingUpAirSensors(secondsLeft);
         }
+    } else {
+        display.airSensorValues(currentValues);
     }
 
     // --- READ SENSORS ---
     if (sensorsWarmedUp && (currentTime - lastReadTime >= Config::Timers::READ_INTERVAL)) {
         currentValues = AirSensors.readAll();
-
-        display.airSensorValues(currentValues);
 
         lastReadTime = currentTime;
     }
@@ -96,6 +87,16 @@ void loop() {
     // --- NETWORK CHECK ---
     if (!Network.isConnected()) {
         Network.connect(true);
+
+#if ENABLE_DEBUG
+        while (!Network.isConnected()) {
+            delay(500);
+        }
+
+        display.debug(WiFi.localIP().toString());
+        TelnetStream.begin();
+        delay(5000);
+#endif
     }
 
     // --- FIRMWARE UPDATES ---
@@ -112,5 +113,5 @@ void loop() {
         lastSendTime = currentTime;
     }
 
-    delay(100);
+    delay(1000);
 }

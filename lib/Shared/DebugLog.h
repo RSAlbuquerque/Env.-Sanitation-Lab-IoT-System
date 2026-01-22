@@ -1,8 +1,7 @@
 #pragma once
 
-#include "ConfigCommon.h"
-
 #include <Arduino.h>
+#include <ConfigCommon.h>
 #include <stdarg.h>
 #include <TelnetStream.h>
 

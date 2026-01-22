@@ -1,6 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <Arduino.h>
+
 struct UserCredentials {
     String identity;
     String username;

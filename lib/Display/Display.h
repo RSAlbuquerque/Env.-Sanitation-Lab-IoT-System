@@ -24,6 +24,7 @@ class Display {
 
     void hydroSensorValues(const HydroValues &data);
     void airSensorValues(const AirValues &data);
+    void warmingUpAirSensors(int seconds);
 
     void updating(const String &currentVersion, const String &newVersion);
     void debug(const String &message);

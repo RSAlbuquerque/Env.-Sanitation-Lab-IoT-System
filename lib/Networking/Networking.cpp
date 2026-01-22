@@ -235,6 +235,9 @@ bool NetworkManager::checkButtonInterrupt() {
         static unsigned long lastPress = 0;
         if (millis() - lastPress > 200) {
             _useEAP = !_useEAP;
+#if ENABLE_DEBUG
+            TelnetStream.stop();
+#endif
             WiFi.disconnect(true);
             _display.clear();
 
