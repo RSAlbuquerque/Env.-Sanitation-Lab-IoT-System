@@ -40,6 +40,7 @@ class AirSensorsManager {
     void readMQ135(AirValues &data);
     void readBME680(AirValues &data);
     void readSPS30(AirValues &data);
+    bool valuesAreInvalid(float mc1p0, float mc2p5, float mc4p0, float mc10p0);
 };
 
 #endif

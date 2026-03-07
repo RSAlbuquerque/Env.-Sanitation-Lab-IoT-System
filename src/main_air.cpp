@@ -81,7 +81,16 @@ void loop() {
     if (sensorsWarmedUp && (currentTime - lastReadTime >= Config::Timers::READ_INTERVAL)) {
         currentValues = AirSensors.readAll();
 
-        lastReadTime = currentTime;
+        if (currentValues.isValid()) {
+            lastReadTime = currentTime;
+            Debug.debug("Valid values are: Temp=%.2f°C Humidity=%.2f%% Pressure=%.2f hPa GasRes=%.2f kOhms CO=%.2f ppm "
+                        "CO2=%.2f ppm NH4=%.2f ppm Alcohol=%.2f ppm Acetone=%.2f ppm Toluene=%.2f ppm PM1.0=%.2f µg/m³ "
+                        "PM2.5=%.2f µg/m³ PM10=%.2f µg/m³",
+                        currentValues.temperature, currentValues.humidity, currentValues.pressure,
+                        currentValues.gasResistance, currentValues.co, currentValues.co2, currentValues.nh4,
+                        currentValues.alcohol, currentValues.acetone, currentValues.toluene, currentValues.pm1_0,
+                        currentValues.pm2_5, currentValues.pm10_0);
+        }
     }
 
     // --- NETWORK CHECK ---
@@ -108,9 +117,12 @@ void loop() {
 
     // --- SEND DATA ---
     if (sensorsWarmedUp && (currentTime - lastSendTime >= Config::Timers::SEND_INTERVAL) && Network.isConnected()) {
-        Network.sendAirData(currentValues);
-
-        lastSendTime = currentTime;
+        if (currentValues.isValid()) {
+            Network.sendAirData(currentValues);
+            lastSendTime = currentTime;
+        } else {
+            Debug.warn("Current sensor values are invalid, skipping data send.");
+        }
     }
 
     delay(1000);

@@ -35,9 +35,15 @@ struct AirValues {
     float gasResistance;
 
     // SPS30 Values
-    int pm1_0;
-    int pm2_5;
-    int pm10_0;
+    float pm1_0;
+    float pm2_5;
+    float pm10_0;
+
+    bool isValid() const {
+        return !isnan(pm2_5) && pm2_5 >= 0 && !isnan(pm10_0) && pm10_0 >= 0 && !isnan(toluene) && toluene >= 0 &&
+               !isnan(co) && co >= 0 && !isnan(co2) && co2 >= 0 && !isnan(nh4) && nh4 >= 0 && !isnan(temperature) &&
+               !isnan(humidity);
+    }
 };
 
 #endif

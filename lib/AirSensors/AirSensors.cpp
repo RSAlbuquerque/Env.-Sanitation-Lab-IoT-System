@@ -162,10 +162,19 @@ void AirSensorsManager::readSPS30(AirValues &data) {
         Debug.error("SPS30 readMeasurementValuesFloat error: %s", errorMessage);
         return;
     }
+    if (valuesAreInvalid(mc1p0, mc2p5, mc4p0, mc10p0)) {
+        Debug.error("SPS30 returned invalid measurement values");
+        return;
+    }
 
-    data.pm1_0 = mc1p0 < 1.0f ? mc1p0 + 1.0f : mc1p0;
-    data.pm2_5 = mc2p5 < 1.0f ? mc2p5 + 1.0f : mc2p5;
-    data.pm10_0 = mc10p0 < 1.0f ? mc10p0 + 1.0f : mc10p0;
+    data.pm1_0 = mc1p0;
+    data.pm2_5 = mc2p5;
+    data.pm10_0 = mc10p0;
 
     Debug.debug("SPS30: PM1=%.2f PM2.5=%.2f PM4=%.2f PM10=%.2f µg/m³", mc1p0, mc2p5, mc4p0, mc10p0);
+}
+
+bool AirSensorsManager::valuesAreInvalid(float mc1p0, float mc2p5, float mc4p0, float mc10p0) {
+    return isnan(mc1p0) || isnan(mc2p5) || isnan(mc4p0) || isnan(mc10p0) ||
+           (mc1p0 == 0 && mc2p5 == 0 && mc4p0 == 0 && mc10p0 == 0);
 }

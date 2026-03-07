@@ -13,7 +13,6 @@ NetworkManager::NetworkManager(Display &display, int buttonPin, const char *eapS
 void NetworkManager::begin(UserCredentials &creds) {
     _creds = creds;
     pinMode(_buttonPin, INPUT_PULLUP);
-    Debug.debug("NetworkManager using EAP: %s", _useEAP ? "true" : "false");
 }
 
 void NetworkManager::handleInput() { checkButtonInterrupt(); }
@@ -137,6 +136,8 @@ void NetworkManager::sendAirData(const AirValues &data) {
         "%s?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f&field4=%.2f&field5=%.2f&field6=%.2f&field7=%.2f&field8=%.2f",
         _thingspeakUrl, _creds.apiKey.c_str(), data.pm2_5, data.pm10_0, data.toluene, data.co, data.co2, data.nh4,
         data.temperature, data.humidity);
+
+    Debug.debug("ThingSpeak URL: %s", urlBuffer);
 
     HTTPClient http;
     http.begin(urlBuffer);

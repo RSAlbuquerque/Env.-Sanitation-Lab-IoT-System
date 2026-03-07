@@ -3,7 +3,7 @@
 
 namespace Config {
     namespace Air {
-        constexpr const char *VERSION = "1.3.4";
+        constexpr const char *VERSION = "1.4.0";
         constexpr const char *FW_URL = "https://pub-d6aabefbfe154c3587f0e92652c96737.r2.dev";
         constexpr unsigned long SENSOR_WARMUP_MS = 60000; // 1 min
 
