@@ -29,13 +29,13 @@ The system architecture is divided into two specialized modules:
 
 - **MQ-135**: Monitors general air quality based on gas resistance (derives CO, CO2, NH4, alcohol, acetone and toluene values).
 - **BME680**: Integrated environmental sensor for Temperature, Humidity, Pressure, and VOC (Volatile Organic Compounds) index.
-- **PMS5003**: Laser-based sensor for measuring particulate matter concentrations (PM1.0, PM2.5, and PM10).
+- **SPS30**: Laser-based sensor for measuring particulate matter concentrations (PM1.0, PM2.5, and PM10).
 
 ## 📊 Data Access
 
 You can view the sensor data collected by this project at the following links (temporary solution until a better system is developed):
 
-- **Air Quality (PMS5003):** [Thingspeak Channel](https://thingspeak.mathworks.com/channels/3229374)
+- **Air Quality:** [Thingspeak Channel](https://thingspeak.mathworks.com/channels/3229374)
 - **Hydro / Water Sensors:** [Thingspeak Channel](https://thingspeak.mathworks.com/channels/3058451)
 
 ---

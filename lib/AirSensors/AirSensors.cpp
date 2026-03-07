@@ -4,10 +4,14 @@
 
 #include <TelnetStream.h>
 
+#ifdef NO_ERROR
+    #undef NO_ERROR
+#endif
+#define NO_ERROR 0
+
 // Constructor
-AirSensorsManager::AirSensorsManager(int mqPin, int pmsRxPin, int pmsTxPin, uint8_t bmeAddr, uint8_t bmeAddrFb)
-    : _mqPin(mqPin), _pmsRx(pmsRxPin), _pmsTx(pmsTxPin), _bmeAddr(bmeAddr), _bmeAddrFb(bmeAddrFb), _pmsSerial(2),
-      _pms(_pmsSerial) {
+AirSensorsManager::AirSensorsManager(int mqPin, uint8_t bmeAddr, uint8_t bmeAddrFb)
+    : _mqPin(mqPin), _bmeAddr(bmeAddr), _bmeAddrFb(bmeAddrFb) {
     _mq135 = new MQUnifiedsensor(BOARD_TYPE, VOLTAGE_RESOLUTION, ADC_BIT_RESOLUTION, _mqPin, MQ_TYPE);
 }
 
@@ -55,23 +59,11 @@ void AirSensorsManager::begin() {
         _bme.setGasHeater(320, 150);
     }
 
-    // PMS5003 Initialization
-    _pmsSerial.begin(9600, SERIAL_8N1, _pmsRx, _pmsTx);
-    delay(300);
-
-    while (_pmsSerial.available()) {
-        _pmsSerial.read();
-    }
-
-    _pms.wakeUp();
-    delay(500);
-
-    _pms.activeMode();
-    delay(500);
-
-    while (_pmsSerial.available()) {
-        _pmsSerial.read();
-    }
+    // SPS30 Initialization
+    Wire.begin();
+    _sps30.begin(Wire, SPS30_I2C_ADDR_69);
+    _sps30.stopMeasurement();
+    _sps30.startMeasurement(SPS30_OUTPUT_FORMAT_OUTPUT_FORMAT_FLOAT);
 }
 
 AirValues AirSensorsManager::readAll() {
@@ -84,7 +76,7 @@ AirValues AirSensorsManager::readAll() {
     Debug.debug("Reading Air Sensors...");
     readMQ135(data);
     readBME680(data);
-    readPMS5003(data);
+    readSPS30(data);
     Debug.debug("Air Sensors reading complete.");
 
     return data;
@@ -143,61 +135,37 @@ void AirSensorsManager::readBME680(AirValues &data) {
     }
 }
 
-void AirSensorsManager::readPMS5003(AirValues &data) {
-    PMS::DATA pmsData;
+void AirSensorsManager::readSPS30(AirValues &data) {
+    uint16_t dataReadyFlag = 0;
+    static char errorMessage[64];
 
-    uint32_t sum1 = 0, sum25 = 0, sum10 = 0;
-    int good = 0;
-
-    if (true) // Enable this to get raw PMS5003 packets for debugging
-        pmsDebug();
-
-    for (int i = 0; i < PMS_FRAMES; ++i) {
-        if (_pms.readUntil(pmsData, PMS_READ_TIMEOUT)) {
-            Debug.debug("Frame %d: PM1=%d PM2.5=%d PM10=%d", i, pmsData.PM_AE_UG_1_0, pmsData.PM_AE_UG_2_5,
-                        pmsData.PM_AE_UG_10_0);
-            sum1 += pmsData.PM_AE_UG_1_0;
-            sum25 += pmsData.PM_AE_UG_2_5;
-            sum10 += pmsData.PM_AE_UG_10_0;
-            good++;
-        } else {
-            Debug.error("PMS5003 frame %d timeout", i);
-        }
-    }
-
-    if (good == 0) {
-        data.pm1_0 = data.pm2_5 = data.pm10_0 = -1;
-        Debug.error("PMS5003: no valid frames");
+    int16_t error = _sps30.readDataReadyFlag(dataReadyFlag);
+    if (error != NO_ERROR) {
+        errorToString(error, errorMessage, sizeof errorMessage);
+        Debug.error("SPS30 readDataReadyFlag error: %s", errorMessage);
         return;
     }
 
-    data.pm1_0 = (int)round((float)sum1 / good);
-    data.pm2_5 = (int)round((float)sum25 / good);
-    data.pm10_0 = (int)round((float)sum10 / good);
-
-    Debug.debug("PMS5003: PM1=%d PM2.5=%d PM10=%d (avg of %d frames)", data.pm1_0, data.pm2_5, data.pm10_0, good);
-}
-
-void AirSensorsManager::pmsDebug() {
-    Debug.debug("=== Reading PMS5003 raw packets ===");
-    for (int i = 0; i < PMS_FRAMES; ++i) {
-        Debug.debug("--- Frame %d ---", i);
-        int bytesAvailable = _pmsSerial.available();
-        Debug.debug("Bytes available: %d", bytesAvailable);
-
-        if (bytesAvailable > 0) {
-            String rawBytes = "Raw bytes: ";
-            for (int j = 0; j < min(bytesAvailable, 32); j++) {
-                if (_pmsSerial.available()) {
-                    uint8_t b = _pmsSerial.read();
-                    char hex[4];
-                    sprintf(hex, "%02X ", b);
-                    rawBytes += hex;
-                }
-            }
-            Debug.debug(rawBytes.c_str());
-        }
-        delay(1000);
+    if (!dataReadyFlag) {
+        Debug.warn("SPS30 data not ready yet");
+        return;
     }
-    Debug.debug("=== End raw packet dump ===");
+
+    float mc1p0 = 0, mc2p5 = 0, mc4p0 = 0, mc10p0 = 0;
+    float nc0p5 = 0, nc1p0 = 0, nc2p5 = 0, nc4p0 = 0, nc10p0 = 0;
+    float typicalParticleSize = 0;
+
+    error = _sps30.readMeasurementValuesFloat(mc1p0, mc2p5, mc4p0, mc10p0, nc0p5, nc1p0, nc2p5, nc4p0, nc10p0,
+                                              typicalParticleSize);
+    if (error != NO_ERROR) {
+        errorToString(error, errorMessage, sizeof errorMessage);
+        Debug.error("SPS30 readMeasurementValuesFloat error: %s", errorMessage);
+        return;
+    }
+
+    data.pm1_0 = mc1p0 < 1.0f ? mc1p0 + 1.0f : mc1p0;
+    data.pm2_5 = mc2p5 < 1.0f ? mc2p5 + 1.0f : mc2p5;
+    data.pm10_0 = mc10p0 < 1.0f ? mc10p0 + 1.0f : mc10p0;
+
+    Debug.debug("SPS30: PM1=%.2f PM2.5=%.2f PM4=%.2f PM10=%.2f µg/m³", mc1p0, mc2p5, mc4p0, mc10p0);
 }

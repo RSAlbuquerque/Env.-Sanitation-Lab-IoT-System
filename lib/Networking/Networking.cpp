@@ -135,8 +135,8 @@ void NetworkManager::sendAirData(const AirValues &data) {
     snprintf(
         urlBuffer, sizeof(urlBuffer),
         "%s?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f&field4=%.2f&field5=%.2f&field6=%.2f&field7=%.2f&field8=%.2f",
-        _thingspeakUrl, _creds.apiKey.c_str(), data.pm2_5, data.pm10_0, data.toluene, data.co, data.co2, data.alcohol,
-        data.nh4, data.acetone);
+        _thingspeakUrl, _creds.apiKey.c_str(), data.pm2_5, data.pm10_0, data.toluene, data.co, data.co2, data.nh4,
+        data.temperature, data.humidity);
 
     HTTPClient http;
     http.begin(urlBuffer);

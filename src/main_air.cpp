@@ -16,8 +16,8 @@ DebugLog Debug;
 
 Display display(Config::Display::WIDTH, Config::Display::HEIGHT, Config::Display::RESET_PIN, Config::Display::ADDRESS);
 
-AirSensorsManager AirSensors(Config::Air::Pins::MQ135, Config::Air::Pins::PMS_RX, Config::Air::Pins::PMS_TX,
-                             Config::Air::Pins::BME680_ADDR, Config::Air::Pins::BME680_ADDR_FB);
+AirSensorsManager AirSensors(Config::Air::Pins::MQ135, Config::Air::Pins::BME680_ADDR,
+                             Config::Air::Pins::BME680_ADDR_FB);
 
 NetworkManager Network(display, Config::Air::Pins::BUTTON, Config::Wifi::EAP_SSID, Config::Wifi::FALLBACK_SSID,
                        Config::Cloud::THINGSPEAK_URL, Config::Wifi::TIMEOUT_MS, Config::Air::FW_URL,

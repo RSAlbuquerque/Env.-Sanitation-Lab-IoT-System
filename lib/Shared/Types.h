@@ -34,7 +34,7 @@ struct AirValues {
     float pressure;
     float gasResistance;
 
-    // PMS5003 Values
+    // SPS30 Values
     int pm1_0;
     int pm2_5;
     int pm10_0;
